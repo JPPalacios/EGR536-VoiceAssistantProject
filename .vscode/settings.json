@@ -1,0 +1,19 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.errorSquiggles": "disabled",
+  "idf.flashType": "UART",
+  "idf.port": "/dev/cu.usbserial-2130",
+  "idf.adapterTargetName": "esp32",
+  "idf.openOcdConfigs": [
+    "board/esp32-bridge.cfg"
+  ],
+  "files.associations": {
+    "event_groups.h": "c",
+    "periph_button.h": "c",
+    "input_key_service.h": "c",
+    "periph_wifi.h": "c",
+    "esp_peripherals.h": "c",
+    "periph_sdcard.h": "c",
+    "audio_idf_version.h": "c"
+  }
+}

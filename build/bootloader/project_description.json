@@ -1,0 +1,23 @@
+{
+    "project_name":       "bootloader",
+    "project_path":       "/Users/jppalacios/esp-adf/esp-idf/components/bootloader/subproject",
+    "build_dir":          "/Users/jppalacios/esp/EGR536-VoiceAssistantProject/build/bootloader",
+    "config_file":        "/Users/jppalacios/esp/EGR536-VoiceAssistantProject/sdkconfig",
+    "config_defaults":    "",
+    "app_elf":            "bootloader.elf",
+    "app_bin":            "bootloader.bin",
+    "git_revision":       "v4.4.4-278-g3c8bc2213c-dirty",
+    "target":             "esp32",
+    "rev":                "0",
+    "min_rev":            "0",
+    "max_rev":            "399",
+    "phy_data_partition": "",
+    "monitor_baud" :      "115200",
+    "monitor_toolprefix": "xtensa-esp32-elf-",
+    "config_environment" : {
+        "COMPONENT_KCONFIGS" : "/Users/jppalacios/esp-adf/esp-idf/components/efuse/Kconfig;/Users/jppalacios/esp-adf/esp-idf/components/esp32/Kconfig;/Users/jppalacios/esp-adf/esp-idf/components/esp_common/Kconfig;/Users/jppalacios/esp-adf/esp-idf/components/esp_hw_support/Kconfig;/Users/jppalacios/esp-adf/esp-idf/components/esp_system/Kconfig;/Users/jppalacios/esp-adf/esp-idf/components/freertos/Kconfig;/Users/jppalacios/esp-adf/esp-idf/components/hal/Kconfig;/Users/jppalacios/esp-adf/esp-idf/components/log/Kconfig;/Users/jppalacios/esp-adf/esp-idf/components/newlib/Kconfig;/Users/jppalacios/esp-adf/esp-idf/components/spi_flash/Kconfig",
+        "COMPONENT_KCONFIGS_PROJBUILD" : "/Users/jppalacios/esp-adf/esp-idf/components/bootloader/Kconfig.projbuild;/Users/jppalacios/esp-adf/esp-idf/components/esp_rom/Kconfig.projbuild;/Users/jppalacios/esp-adf/esp-idf/components/esptool_py/Kconfig.projbuild;/Users/jppalacios/esp-adf/esp-idf/components/partition_table/Kconfig.projbuild"
+    },
+    "build_components" : [ "bootloader", "bootloader_support", "efuse", "esp32", "esp_common", "esp_hw_support", "esp_rom", "esp_system", "esptool_py", "freertos", "hal", "log", "main", "micro-ecc", "newlib", "partition_table", "soc", "spi_flash", "xtensa", "" ],
+    "build_component_paths" : [ "/Users/jppalacios/esp-adf/esp-idf/components/bootloader", "/Users/jppalacios/esp-adf/esp-idf/components/bootloader_support", "/Users/jppalacios/esp-adf/esp-idf/components/efuse", "/Users/jppalacios/esp-adf/esp-idf/components/esp32", "/Users/jppalacios/esp-adf/esp-idf/components/esp_common", "/Users/jppalacios/esp-adf/esp-idf/components/esp_hw_support", "/Users/jppalacios/esp-adf/esp-idf/components/esp_rom", "/Users/jppalacios/esp-adf/esp-idf/components/esp_system", "/Users/jppalacios/esp-adf/esp-idf/components/esptool_py", "/Users/jppalacios/esp-adf/esp-idf/components/freertos", "/Users/jppalacios/esp-adf/esp-idf/components/hal", "/Users/jppalacios/esp-adf/esp-idf/components/log", "/Users/jppalacios/esp-adf/esp-idf/components/bootloader/subproject/main", "/Users/jppalacios/esp-adf/esp-idf/components/bootloader/subproject/components/micro-ecc", "/Users/jppalacios/esp-adf/esp-idf/components/newlib", "/Users/jppalacios/esp-adf/esp-idf/components/partition_table", "/Users/jppalacios/esp-adf/esp-idf/components/soc", "/Users/jppalacios/esp-adf/esp-idf/components/spi_flash", "/Users/jppalacios/esp-adf/esp-idf/components/xtensa", "" ]
+}
