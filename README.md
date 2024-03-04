@@ -1,21 +1,32 @@
-﻿# Record and Upload WAV Files to HTTP Server
+﻿<!-- # Record and Upload WAV Files to HTTP Server -->
+# ESP32 Voice Assistant
 
-- [中文版本](./README_CN.md)
-- Basic Example: ![alt text](../../../docs/_static/level_basic.png "Basic Example")
-
+<!-- - Basic Example: ![alt text](../../../docs/_static/level_basic.png "Basic Example") -->
 
 ## Example Brief
 
-This example demonstrates the process of using HTTP stream to upload voice data to an HTTP server created by Python and saving it as a WAV file.
+This example demonstrates how to create a simple OpenAI voice assistant on an ESP32 LyraT-Mini development board.
 
-After the development board and HTTP server are running correctly, press the [Rec] key on the audio board to record and upload the voice data to the HTTP server via HTTP streaming, and release the key to stop the recording. At the same time, the HTTP server on the PC side writes the received data into the WAV file and name it after the receiving time.
+This project creates two pipelines. The recording pipeline captures sound and streams the raw data over Wi-Fi to an HTTP server where it is saved as a `.wav` file. The playback pipeline reads back an `.mp3` file from the server to play on the board speaker.
 
-The complete pipeline of this example is as follows:
+Follow these steps to make it run:
+1. Press the [Rec] key on the audio board to record and upload to the server over Wi-Fi, release the key to stop recording.
+2. Press the [Vol+]/[Vol-] key to turn up/down the volume.
+3. Press the [Mode] key to end the program.
+
+The recording pipeline looks like this:
 
 ```c
-mic ---> codec_chip ---> i2s_stream ---> http_stream >>>> [Wi-Fi] >>>> http_server ---> wav_file
+microphone --> codec_chip --> i2s_stream --> http_stream ))) (2.4 GHz Wi-Fi) ))) [http_server]
 ```
 
+The playback pipeline is as follows:
+
+```c
+[http_server] ))) (2.4 GHz Wi-Fi) ))) http_stream --> mp3_decoder --> i2s_stream --> codec_chip --> speaker
+```
+
+The responses are handled by OpenAI's Python API for voice transcription, chat completion, and text-to-speech audio generation.
 
 ## Environment Setup
 
@@ -277,9 +288,9 @@ If your development board cannot upload the voice to the HTTP server, please che
 
 ## Technical Support and Feedback
 
-Please use the following feedback channels:
+<!-- Please use the following feedback channels:
 
 * For technical queries, go to the [esp32.com](https://esp32.com/viewforum.php?f=20) forum
 * For a feature request or bug report, create a [GitHub issue](https://github.com/espressif/esp-adf/issues)
 
-We will get back to you as soon as possible.
+We will get back to you as soon as possible. -->

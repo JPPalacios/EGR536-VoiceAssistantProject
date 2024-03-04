@@ -134,8 +134,8 @@ CONFIG_PARTITION_TABLE_MD5=y
 #
 # Example Configuration
 #
-CONFIG_WIFI_SSID="SH1100SW2.4"
-CONFIG_WIFI_PASSWORD="Cocohydra123"
+CONFIG_WIFI_SSID="GV-Student"
+CONFIG_WIFI_PASSWORD="G01783155iwzj-gvsu"
 CONFIG_SERVER_URI="http://10.0.0.107:8000/upload"
 # end of Example Configuration
 

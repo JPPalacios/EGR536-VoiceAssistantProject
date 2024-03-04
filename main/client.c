@@ -45,10 +45,11 @@
 #define AUDIO_BITS         16
 #define AUDIO_CHANNELS     1
 
-static const char *TAG = "OPENAI_ASSISTANT";
+static const char *TAG = "VOICE_ASSISTANT";
 static esp_periph_set_handle_t set;
 
 // todo: fix slow, low-pitch voice
+// todo: fix Wi-Fi, talk to IT
 
 esp_err_t _http_stream_event_handle(http_stream_event_msg_t *msg)
 {
@@ -129,7 +130,6 @@ static audio_element_handle_t create_i2s_stream(int sample_rates, int bits, int 
     i2s_cfg.type = AUDIO_STREAM_READER;
     i2s_cfg.out_rb_size = 16 * 1024; // Increase buffer to avoid missing data in bad network conditions
     audio_element_handle_t i2s_stream = i2s_stream_init(&i2s_cfg);
-    // i2s_stream = i2s_stream_init(&i2s_read_cfg);
     return i2s_stream;
   }
   else
@@ -137,33 +137,8 @@ static audio_element_handle_t create_i2s_stream(int sample_rates, int bits, int 
     i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
     i2s_cfg.type = AUDIO_STREAM_WRITER;
     audio_element_handle_t i2s_stream = i2s_stream_init(&i2s_cfg);
-    // i2s_stream = i2s_stream_init(&i2s_write_cfg);
     return i2s_stream;
   }
-
-    // i2s_stream_cfg_t i2s_cfg;// = I2S_STREAM_CFG_DEFAULT();
-    // i2s_cfg.type = type;
-// #if defined CONFIG_ESP_LYRAT_MINI_V1_1_BOARD
-//     if (type == AUDIO_STREAM_READER) {
-// #if (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0))
-//         i2s_cfg.chan_cfg.id = CODEC_ADC_I2S_PORT;
-//         i2s_cfg.std_cfg.slot_cfg.slot_mode = I2S_SLOT_MODE_MONO;
-//         i2s_cfg.std_cfg.slot_cfg.slot_mask = I2S_STD_SLOT_LEFT;
-// #else
-//         i2s_cfg = I2S_STREAM_CFG_DEFAULT_WITH_PARA(CODEC_ADC_I2S_PORT, 44100, 16, type);
-//         // i2s_cfg.i2s_port = CODEC_ADC_I2S_PORT;
-//         // i2s_cfg.i2s_config.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
-//         i2s_cfg.out_rb_size = 16 * 1024; // Increase buffer to avoid missing data in bad network conditions
-// #endif
-//     }
-// #endif
-
-
-
-  // audio_element_handle_t i2s_stream = i2s_stream_init(&i2s_cfg);
-  // mem_assert(i2s_stream);
-  // audio_element_set_music_info(i2s_stream, sample_rates, channels, bits);
-  // return i2s_stream;
 }
 
 static audio_element_handle_t create_http_stream(audio_stream_type_t type)
@@ -386,10 +361,10 @@ void app_main(void)
 
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
-      // NVS partition was truncated and needs to be erased
-      // Retry nvs_flash_init
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      err = nvs_flash_init();
+    // NVS partition was truncated and needs to be erased
+    // Retry nvs_flash_init
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    err = nvs_flash_init();
   }
 #if (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 1, 0))
   ESP_ERROR_CHECK(esp_netif_init());
