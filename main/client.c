@@ -48,7 +48,7 @@
 static const char *TAG = "OPENAI_ASSISTANT";
 static esp_periph_set_handle_t set;
 
-
+// todo: fix slow, low-pitch voice
 
 esp_err_t _http_stream_event_handle(http_stream_event_msg_t *msg)
 {
