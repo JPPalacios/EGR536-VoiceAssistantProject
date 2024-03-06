@@ -50,6 +50,7 @@ static esp_periph_set_handle_t set;
 
 // todo: fix slow, low-pitch voice
 // todo: fix Wi-Fi, talk to IT
+// todo: add mode/vol functionality
 
 esp_err_t _http_stream_event_handle(http_stream_event_msg_t *msg)
 {

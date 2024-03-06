@@ -3,11 +3,15 @@ import wave
 import argparse
 import socket
 
+import requests # use for OpenWeather API
+
 from urllib import parse
 from http.server import HTTPServer
 from http.server import BaseHTTPRequestHandler
 
 from openai import OpenAI
+
+# todo: integrate `fetch_weather` notebook calls into server
 
 PORT = 8000
 
@@ -83,6 +87,11 @@ class Handler(BaseHTTPRequestHandler):
                 file=open(speech_prompt, "rb"),
                 response_format="text"
             )
+
+            # todo: parse through the user's prompt for key words like 'weather' or 'music'
+            if 'weather' in text_prompt or 'music' in text_prompt:
+                print("keyword detected")
+                # fetch weather or music
 
             # note: assistant chat text response
             text_response = client.chat.completions.create(
