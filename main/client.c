@@ -41,16 +41,15 @@
 
 #define RESPONSE_URI "http://10.0.0.107:8000/speech_response.mp3"
 
-#define AUDIO_SAMPLE_RATE  16000
+#define AUDIO_SAMPLE_RATE  24000
 #define AUDIO_BITS         16
 #define AUDIO_CHANNELS     1
 
 static const char *TAG = "VOICE_ASSISTANT";
 static esp_periph_set_handle_t set;
+int player_volume;
 
-// todo: fix slow, low-pitch voice
 // todo: fix Wi-Fi, talk to IT
-// todo: add mode/vol functionality
 
 esp_err_t _http_stream_event_handle(http_stream_event_msg_t *msg)
 {
@@ -123,11 +122,11 @@ esp_err_t _http_stream_event_handle(http_stream_event_msg_t *msg)
 
 
 
-static audio_element_handle_t create_i2s_stream(int sample_rates, int bits, int channels, audio_stream_type_t type)
+static audio_element_handle_t create_i2s_stream(audio_stream_type_t type)
 {
   if (type == AUDIO_STREAM_READER)
   {
-    i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT_WITH_PARA(CODEC_ADC_I2S_PORT, 44100, 16, AUDIO_STREAM_READER);
+    i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT_WITH_PARA(CODEC_ADC_I2S_PORT, 44100, AUDIO_BITS, AUDIO_STREAM_READER);
     i2s_cfg.type = AUDIO_STREAM_READER;
     i2s_cfg.out_rb_size = 16 * 1024; // Increase buffer to avoid missing data in bad network conditions
     audio_element_handle_t i2s_stream = i2s_stream_init(&i2s_cfg);
@@ -165,7 +164,7 @@ static audio_element_handle_t create_mp3_decoder()
 
 
 
-void record_playback_task()
+void record_playback_task(audio_board_handle_t board_handle)
 {
   audio_pipeline_handle_t pipeline_record = NULL;
   audio_pipeline_handle_t pipeline_play   = NULL;
@@ -178,7 +177,7 @@ void record_playback_task()
 
   //> setup our recorder pipeline elements
   ESP_LOGI(TAG, "[1.2] Create audio elements for recorder pipeline");
-  audio_element_handle_t i2s_stream_reader = create_i2s_stream(AUDIO_SAMPLE_RATE, AUDIO_BITS, AUDIO_BITS, AUDIO_STREAM_READER);
+  audio_element_handle_t i2s_stream_reader = create_i2s_stream(AUDIO_STREAM_READER);
   audio_element_handle_t http_stream_writer = create_http_stream(AUDIO_STREAM_WRITER);
 
   ESP_LOGI(TAG, "[1.3] Register audio elements to recorder pipeline");
@@ -191,7 +190,7 @@ void record_playback_task()
 
   //> setup our play pipeline elements
   ESP_LOGI(TAG, "[2.2] Create audio elements for playback pipeline");
-  audio_element_handle_t i2s_stream_writer = create_i2s_stream(AUDIO_SAMPLE_RATE, AUDIO_BITS, AUDIO_BITS, AUDIO_STREAM_WRITER);
+  audio_element_handle_t i2s_stream_writer = create_i2s_stream(AUDIO_STREAM_WRITER);
   audio_element_handle_t http_stream_reader = create_http_stream(AUDIO_STREAM_READER);
   audio_element_handle_t mp3_decoder = create_mp3_decoder();
 
@@ -226,13 +225,34 @@ void record_playback_task()
       continue;
     }
 
+    if ((int) msg.data == get_input_volup_id())
+    {
+      ESP_LOGI(TAG, "[ * ] [Vol+] touch tap event");
+      player_volume += 10;
+      if (player_volume > 100) {
+        player_volume = 100;
+      }
+      audio_hal_set_volume(board_handle->audio_hal, player_volume);
+      ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
+    }
+
+    if ((int) msg.data == get_input_voldown_id()) {
+      ESP_LOGI(TAG, "[ * ] [Vol-] touch tap event");
+      player_volume -= 10;
+      if (player_volume < 0) {
+        player_volume = 0;
+      }
+      audio_hal_set_volume(board_handle->audio_hal, player_volume);
+      ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
+    }
+
     if ((int) msg.data == get_input_mode_id())
     {
       if ((msg.cmd == PERIPH_BUTTON_LONG_PRESSED) || (msg.cmd == PERIPH_BUTTON_PRESSED))
       {
-        ESP_LOGI(TAG, "[MODE] Button pressed");
+        ESP_LOGW(TAG, "[ MODE ] Button pressed, stop event received");
+        break;
       }
-      continue;
     }
 
     if ((int) msg.data == get_input_rec_id())
@@ -282,6 +302,7 @@ void record_playback_task()
       }
     }
 
+    // note: not seeing this if-statement executed...still works from playback pipeline?
     if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT
       && msg.source == (void *) mp3_decoder
       && msg.cmd == AEL_MSG_CMD_REPORT_MUSIC_INFO)
@@ -294,16 +315,6 @@ void record_playback_task()
 
       i2s_stream_set_clk(i2s_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
       continue;
-    }
-
-    /* Stop when the last pipeline element (i2s_stream_writer in this case) receives stop event */
-    if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT
-        && msg.source == (void *) i2s_stream_writer
-        && msg.cmd == AEL_MSG_CMD_REPORT_STATUS
-        && (((int)msg.data == AEL_STATUS_STATE_STOPPED) || ((int)msg.data == AEL_STATUS_STATE_FINISHED)))
-    {
-      ESP_LOGW(TAG, "[ * ] Stop event received");
-      break;
     }
   }
 
@@ -398,7 +409,9 @@ void app_main(void)
   audio_board_handle_t board_handle = audio_board_init();
   audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
 
+  audio_hal_get_volume(board_handle->audio_hal, &player_volume);
+
   // Start record/playback task
-  record_playback_task();
+  record_playback_task(board_handle);
   esp_periph_set_destroy(set);
 }

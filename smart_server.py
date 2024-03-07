@@ -4,6 +4,7 @@ import argparse
 import socket
 
 import requests # use for OpenWeather API
+import json # use to parse through city.list.json
 
 from urllib import parse
 from http.server import HTTPServer
@@ -11,12 +12,10 @@ from http.server import BaseHTTPRequestHandler
 
 from openai import OpenAI
 
-# todo: integrate `fetch_weather` notebook calls into server
-
 PORT = 8000
 
 MAX_PROMPT_TOKENS : int = 100
-
+API_KEY = ''
 client = OpenAI()
 
 speech_response_file : str = 'speech_response.mp3'
@@ -88,20 +87,50 @@ class Handler(BaseHTTPRequestHandler):
                 response_format="text"
             )
 
-            # todo: parse through the user's prompt for key words like 'weather' or 'music'
-            if 'weather' in text_prompt or 'music' in text_prompt:
-                print("keyword detected")
-                # fetch weather or music
+            # note: parse through the user's prompt for key words like 'weather' or 'music'
+            if 'weather' in text_prompt:
+                print("requesting weather information...")
 
-            # note: assistant chat text response
-            text_response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": text_prompt}
-                ],
-                max_tokens=MAX_PROMPT_TOKENS
-            ).choices[0].message.content
+                # note: parse out city name from text prompt
+                city_name = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "Only return the city name embedded within text responses"},
+                        {"role": "user", "content": text_prompt}
+                    ],
+                    max_tokens=MAX_PROMPT_TOKENS
+                ).choices[0].message.content
+
+                country_code = 'us'
+
+                url = f'https://api.openweathermap.org/data/2.5/weather?q={city_name},{country_code}&appid={API_KEY}&units=imperial'
+
+                weather_data = f"{requests.get(url).json()}"
+
+                content = f'''
+                Your job is to summarize the following 'weather' section of the json file into natural English.
+                Make sure imperial units are spelled out in english. Keep it within {MAX_PROMPT_TOKENS} tokens.
+                '''
+
+                # note: assistant chat text response
+                text_response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": content},
+                        {"role": "user", "content": weather_data}
+                    ],
+                    max_tokens=MAX_PROMPT_TOKENS
+                ).choices[0].message.content
+            else:
+                # note: assistant chat text response
+                text_response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": text_prompt}
+                    ],
+                    max_tokens=MAX_PROMPT_TOKENS
+                ).choices[0].message.content
 
             # note: text-to-speech response generation
             speech_response = client.audio.speech.create(
@@ -133,9 +162,6 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(speech_response_data)
 
-        # self.send_response(200)
-        # self.send_header('Content-type', "text/html;charset=utf-8")
-        # self.end_headers()
 
 def get_host_ip():
     # https://www.cnblogs.com/z-x-y/p/9529930.html
