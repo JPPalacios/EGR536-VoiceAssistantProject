@@ -12,13 +12,17 @@ from http.server import BaseHTTPRequestHandler
 
 from openai import OpenAI
 
+# todo: include city.json for searching, less API calls
+
 PORT = 8000
+MAX_PROMPT_TOKENS = 100
 
-MAX_PROMPT_TOKENS : int = 100
-API_KEY = ''
+SPEECH_RESPONSE_FILE = 'speech_response.mp3'
+TEXT_RESPONSE_FILE   = 'text_response.txt'
+
+OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY')
+
 client = OpenAI()
-
-speech_response_file : str = 'speech_response.mp3'
 
 class Handler(BaseHTTPRequestHandler):
     def _set_headers(self, length):
@@ -57,6 +61,7 @@ class Handler(BaseHTTPRequestHandler):
         bits = 0
         channel = 0
         print("Do Post......")
+
         if (request_file_path == 'upload'
             and self.headers.get('Transfer-Encoding', '').lower() == 'chunked'):
             data = []
@@ -78,6 +83,7 @@ class Handler(BaseHTTPRequestHandler):
                     chunk_data = self._get_chunk_data(chunk_size)
                     data += chunk_data
 
+            # note: store our byte data to .wav file
             speech_prompt = self._write_wav(data, int(sample_rates), int(bits), int(channel))
 
             # note: speech-to-text prompt transcription
@@ -103,7 +109,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 country_code = 'us'
 
-                url = f'https://api.openweathermap.org/data/2.5/weather?q={city_name},{country_code}&appid={API_KEY}&units=imperial'
+                url = f'https://api.openweathermap.org/data/2.5/weather?q={city_name},{country_code}&appid={OPENWEATHER_API_KEY}&units=imperial'
 
                 weather_data = f"{requests.get(url).json()}"
 
@@ -132,15 +138,19 @@ class Handler(BaseHTTPRequestHandler):
                     max_tokens=MAX_PROMPT_TOKENS
                 ).choices[0].message.content
 
+            # note: store our latest response in text form
+            with open(TEXT_RESPONSE_FILE, "w") as file:
+                file.write(text_response)
+
             # note: text-to-speech response generation
             speech_response = client.audio.speech.create(
                 model="tts-1",
-                voice="fable",
+                voice="echo",
                 input=text_response
             )
 
             # note: stream and read our response back
-            speech_response.stream_to_file(speech_response_file)
+            speech_response.stream_to_file(SPEECH_RESPONSE_FILE)
 
             self.send_response(200)
             self.send_header("Content-type", "text/html;charset=utf-8")
@@ -149,15 +159,33 @@ class Handler(BaseHTTPRequestHandler):
             body = 'File {} was written, size {}'.format(speech_prompt, total_bytes)
             self.wfile.write(body.encode('utf-8'))
 
+        elif (request_file_path == 'log'):
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(post_data)
+            counter = data.get('counter')
+
+            print("Received counter:", counter)
+
+            # note: text-to-speech response generation
+            speech_response = client.audio.speech.create(
+                model="tts-1",
+                voice="echo",
+                input=f"this device has been prompted {counter} times."
+            )
+
+            # note: stream and read our response back
+            speech_response.stream_to_file(SPEECH_RESPONSE_FILE)
+
     def do_GET(self):
         print("Do GET")
 
-        with open(speech_response_file, "rb") as file:
+        with open(SPEECH_RESPONSE_FILE, "rb") as file:
             speech_response_data = file.read()
 
         self.send_response(200)
         self.send_header("Content-type", "audio/mpeg")
-        self.send_header("Content-Disposition", f"attachment; filename={speech_response_file}")
+        self.send_header("Content-Disposition", f"attachment; filename={SPEECH_RESPONSE_FILE}")
         self.send_header("Content-Length", str(len(speech_response_data)))
         self.end_headers()
         self.wfile.write(speech_response_data)

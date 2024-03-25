@@ -1,4 +1,4 @@
-/* Record WAV file to SD Card
+/* Voice Assistant
 
   This example code is in the Public Domain (or CC0 licensed, at your option.)
 
@@ -7,51 +7,171 @@
   CONDITIONS OF ANY KIND, either express or implied.
 */
 
-#include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
+
+#include "client.h"
+#include "sdkconfig.h"
+#include "board.h"
+
+#include "esp_err.h"
+#include "esp_check.h"
 #include "esp_log.h"
-#include "esp_wifi.h"
+
+#include "nvs.h"
 #include "nvs_flash.h"
 
-#include "esp_http_client.h"
-#include "sdkconfig.h"
+#include "audio_hal.h"
 #include "audio_element.h"
-#include "audio_pipeline.h"
-#include "audio_event_iface.h"
 #include "audio_common.h"
-#include "board.h"
-#include "http_stream.h"
 #include "i2s_stream.h"
 #include "wav_encoder.h"
 #include "mp3_decoder.h"
-#include "esp_peripherals.h"
-#include "periph_button.h"
-#include "periph_wifi.h"
-#include "periph_sdcard.h"
-#include "filter_resample.h"
-#include "audio_idf_version.h"
 
-#if (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 1, 0))
 #include "esp_netif.h"
-#else
-#include "tcpip_adapter.h"
-#endif
+#include "periph_wifi.h"
+#include "esp_http_client.h"
+#include "http_stream.h"
+#include "esp_http_client.h"
 
-#define RESPONSE_URI "http://10.0.0.107:8000/speech_response.mp3"
+static const char *TAG = "CLIENT";
 
-#define AUDIO_SAMPLE_RATE  24000
-#define AUDIO_BITS         16
-#define AUDIO_CHANNELS     1
+/* NVS FUNCTIONS */
 
-static const char *TAG = "VOICE_ASSISTANT";
-static esp_periph_set_handle_t set;
-int player_volume;
+esp_err_t save_prompt_count(void)
+{
+  nvs_handle_t my_handle;
+  esp_err_t err;
 
-// todo: fix Wi-Fi, talk to IT
+  // Open
+  err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
+  if (err != ESP_OK) return err;
 
-esp_err_t _http_stream_event_handle(http_stream_event_msg_t *msg)
+  // Read
+  int32_t prompt_count = 0; // value will default to 0, if not set yet in NVS
+  err = nvs_get_i32(my_handle, "prompt_count", &prompt_count);
+  if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+  // Write
+  prompt_count++;
+  err = nvs_set_i32(my_handle, "prompt_count", prompt_count);
+  if (err != ESP_OK) return err;
+
+  // Commit written value.
+  // After setting any values, nvs_commit() must be called to ensure changes are written
+  // to flash storage. Implementations may write to storage at other times,
+  // but this is not guaranteed.
+  err = nvs_commit(my_handle);
+  if (err != ESP_OK) return err;
+
+  /* Close */
+  nvs_close(my_handle);
+
+  return ESP_OK;
+}
+
+int get_prompt_count(void)
+{
+  nvs_handle_t my_handle;
+  esp_err_t err;
+
+  // Open
+  err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
+  if (err != ESP_OK) return err;
+
+  // Read
+  int32_t prompt_count = 0; // value will default to 0, if not set yet in NVS
+  err = nvs_get_i32(my_handle, "prompt_count", &prompt_count);
+  if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+  return prompt_count;
+}
+
+esp_err_t save_run_time(void)
+{
+  nvs_handle_t my_handle;
+  esp_err_t err;
+
+  // Open
+  err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
+  if (err != ESP_OK) return err;
+
+  // Read the size of memory space required for blob
+  size_t required_size = 0;  // value will default to 0, if not set yet in NVS
+  err = nvs_get_blob(my_handle, "run_time", NULL, &required_size);
+  if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+  // Read previously saved blob if available
+  uint32_t* run_time = malloc(required_size + sizeof(uint32_t));
+  if (required_size > 0) {
+    err = nvs_get_blob(my_handle, "run_time", run_time, &required_size);
+    if (err != ESP_OK) {
+      free(run_time);
+      return err;
+    }
+  }
+
+  // Write value including previously saved blob if available
+  required_size += sizeof(uint32_t);
+  run_time[required_size / sizeof(uint32_t) - 1] = xTaskGetTickCount() * portTICK_PERIOD_MS;
+  err = nvs_set_blob(my_handle, "run_time", run_time, required_size);
+  free(run_time);
+
+  if (err != ESP_OK) return err;
+
+  // Commit
+  err = nvs_commit(my_handle);
+  if (err != ESP_OK) return err;
+
+  // Close
+  nvs_close(my_handle);
+  return ESP_OK;
+}
+
+esp_err_t print_what_saved(void)
+{
+  nvs_handle_t my_handle;
+  esp_err_t err;
+
+  printf("Voice Asistant Logs\n");
+
+  // Open
+  err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
+  if (err != ESP_OK) return err;
+
+  // Read prompt counter
+  int32_t prompt_count = 0; // value will default to 0, if not set yet in NVS
+  err = nvs_get_i32(my_handle, "prompt_count", &prompt_count);
+  if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+  printf("\tPrompt count: %d\n", prompt_count);
+
+  // Read run time blob
+  size_t required_size = 0;  // value will default to 0, if not set yet in NVS
+  // obtain required memory space to store blob being read from NVS
+  err = nvs_get_blob(my_handle, "run_time", NULL, &required_size);
+  if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+  printf("\tRun time:\n");
+  if (required_size == 0) {
+    printf("\tNothing saved yet!\n");
+  } else {
+    uint32_t* run_time = malloc(required_size);
+    err = nvs_get_blob(my_handle, "run_time", run_time, &required_size);
+    if (err != ESP_OK) {
+      free(run_time);
+      return err;
+    }
+    for (int i = 0; i < required_size / sizeof(uint32_t); i++) {
+      printf("\t\t%d: %d\n", i + 1, run_time[i]);
+    }
+    free(run_time);
+  }
+
+  // Close
+  nvs_close(my_handle);
+  return ESP_OK;
+}
+
+/* WI-FI FUNCTIONS */
+
+esp_err_t _http_stream_event_handler(http_stream_event_msg_t *msg)
 {
   esp_http_client_handle_t http = (esp_http_client_handle_t)msg->http_client;
   char len_buf[16];
@@ -120,9 +240,77 @@ esp_err_t _http_stream_event_handle(http_stream_event_msg_t *msg)
   return ESP_OK;
 }
 
+esp_err_t _http_event_handler(esp_http_client_event_t *evt)
+{
 
+  switch(evt->event_id) {
+    case HTTP_EVENT_ERROR:
+      ESP_LOGI(TAG, "HTTP_EVENT_ERROR");
+      break;
+    case HTTP_EVENT_ON_CONNECTED:
+      ESP_LOGI(TAG, "HTTP_EVENT_ON_CONNECTED");
+      break;
+    case HTTP_EVENT_HEADER_SENT:
+      ESP_LOGI(TAG, "HTTP_EVENT_HEADER_SENT");
+      break;
+    case HTTP_EVENT_ON_HEADER:
+      ESP_LOGI(TAG, "HTTP_EVENT_ON_HEADER");
+      printf("%.*s", evt->data_len, (char*)evt->data);
+      break;
+    case HTTP_EVENT_ON_DATA:
+      ESP_LOGI(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+      break;
+    case HTTP_EVENT_ON_FINISH:
+      ESP_LOGI(TAG, "HTTP_EVENT_ON_FINISH");
+      break;
+    case HTTP_EVENT_DISCONNECTED:
+      ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
+      break;
+  }
 
-static audio_element_handle_t create_i2s_stream(audio_stream_type_t type)
+  return ESP_OK;
+}
+
+esp_err_t http_post_request(const char* url, int count)
+{
+  esp_err_t error = ESP_OK;
+
+  esp_http_client_config_t config = {
+    .url = url,
+    .event_handler = _http_event_handler,
+  };
+  ESP_LOGW(TAG, "sending out to %s", url);
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+
+  char data[20]; // Adjust the size according to your data
+  // snprintf(data, sizeof(data), "%d", count);
+  snprintf(data, sizeof(data), "{\"counter\": %d}", count);
+
+  esp_http_client_set_method(client, HTTP_METHOD_POST);
+  // esp_http_client_set_header(client, "prompt_count", data);
+  esp_http_client_set_header(client, "Content-Type", "application/json");
+
+  esp_http_client_set_post_field(client, data, strlen(data));
+
+  error = esp_http_client_perform(client);
+  if (error == ESP_OK)
+  {
+    ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %d",
+            esp_http_client_get_status_code(client),
+            esp_http_client_get_content_length(client));
+  }
+  else
+  {
+    ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(error));
+  }
+  esp_http_client_cleanup(client);
+
+  return error;
+}
+
+/* AUDIO-ELEMENT FUNCTIONS */
+
+audio_element_handle_t create_i2s_stream(audio_stream_type_t type)
 {
   if (type == AUDIO_STREAM_READER)
   {
@@ -141,14 +329,14 @@ static audio_element_handle_t create_i2s_stream(audio_stream_type_t type)
   }
 }
 
-static audio_element_handle_t create_http_stream(audio_stream_type_t type)
+audio_element_handle_t create_http_stream(audio_stream_type_t type)
 {
   http_stream_cfg_t http_cfg = HTTP_STREAM_CFG_DEFAULT();
   http_cfg.type = type;
 
   if (http_cfg.type == AUDIO_STREAM_WRITER)
   {
-    http_cfg.event_handle = _http_stream_event_handle;
+    http_cfg.event_handle = _http_stream_event_handler;
   }
 
   audio_element_handle_t http_stream = http_stream_init(&http_cfg);
@@ -156,262 +344,15 @@ static audio_element_handle_t create_http_stream(audio_stream_type_t type)
   return http_stream;
 }
 
-static audio_element_handle_t create_mp3_decoder()
+audio_element_handle_t create_mp3_decoder(void)
 {
   mp3_decoder_cfg_t mp3_cfg = DEFAULT_MP3_DECODER_CONFIG();
   return mp3_decoder_init(&mp3_cfg);
 }
 
-
-
-void record_playback_task(audio_board_handle_t board_handle)
+int get_audio_hal_volume(audio_board_handle_t board_handle)
 {
-  audio_pipeline_handle_t pipeline_record = NULL;
-  audio_pipeline_handle_t pipeline_play   = NULL;
-  audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
-
-  ESP_LOGI(TAG, "[1.1] Initialize recorder pipeline");
-  pipeline_record = audio_pipeline_init(&pipeline_cfg);
-  pipeline_play = audio_pipeline_init(&pipeline_cfg);
-
-
-  //> setup our recorder pipeline elements
-  ESP_LOGI(TAG, "[1.2] Create audio elements for recorder pipeline");
-  audio_element_handle_t i2s_stream_reader = create_i2s_stream(AUDIO_STREAM_READER);
-  audio_element_handle_t http_stream_writer = create_http_stream(AUDIO_STREAM_WRITER);
-
-  ESP_LOGI(TAG, "[1.3] Register audio elements to recorder pipeline");
-  audio_pipeline_register(pipeline_record, i2s_stream_reader, "i2s_reader");
-  audio_pipeline_register(pipeline_record, http_stream_writer, "http_writer");
-
-  const char *link_rec[2] = {"i2s_reader", "http_writer"};
-  audio_pipeline_link(pipeline_record, &link_rec[0], 2);
-
-
-  //> setup our play pipeline elements
-  ESP_LOGI(TAG, "[2.2] Create audio elements for playback pipeline");
-  audio_element_handle_t i2s_stream_writer = create_i2s_stream(AUDIO_STREAM_WRITER);
-  audio_element_handle_t http_stream_reader = create_http_stream(AUDIO_STREAM_READER);
-  audio_element_handle_t mp3_decoder = create_mp3_decoder();
-
-  ESP_LOGI(TAG, "[2.3] Register audio elements to playback pipeline");
-  audio_pipeline_register(pipeline_play, http_stream_reader, "http_reader");
-  audio_pipeline_register(pipeline_play, mp3_decoder, "mp3");
-  audio_pipeline_register(pipeline_play, i2s_stream_writer, "i2s_writer");
-
-  const char *link_play[3] = {"http_reader", "mp3", "i2s_writer"};
-  audio_pipeline_link(pipeline_play, &link_play[0], 3);
-
-
-  //> setup event listener
-  ESP_LOGI(TAG, "[ 3 ] Set up  event listener");
-  audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
-  audio_event_iface_handle_t evt = audio_event_iface_init(&evt_cfg);
-  audio_event_iface_set_listener(esp_periph_set_get_event_iface(set), evt);
-  ESP_LOGW(TAG, "Press [Rec] to start recording");
-
-  audio_element_set_uri(http_stream_writer, CONFIG_SERVER_URI);
-  audio_element_set_uri(http_stream_reader, RESPONSE_URI);
-
-  //> run event loop
-  while(1)
-  {
-    audio_event_iface_msg_t msg;
-
-    esp_err_t ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
-    if (ret != ESP_OK)
-    {
-      ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
-      continue;
-    }
-
-    if ((int) msg.data == get_input_volup_id())
-    {
-      ESP_LOGI(TAG, "[ * ] [Vol+] touch tap event");
-      player_volume += 10;
-      if (player_volume > 100) {
-        player_volume = 100;
-      }
-      audio_hal_set_volume(board_handle->audio_hal, player_volume);
-      ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
-    }
-
-    if ((int) msg.data == get_input_voldown_id()) {
-      ESP_LOGI(TAG, "[ * ] [Vol-] touch tap event");
-      player_volume -= 10;
-      if (player_volume < 0) {
-        player_volume = 0;
-      }
-      audio_hal_set_volume(board_handle->audio_hal, player_volume);
-      ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
-    }
-
-    if ((int) msg.data == get_input_mode_id())
-    {
-      if ((msg.cmd == PERIPH_BUTTON_LONG_PRESSED) || (msg.cmd == PERIPH_BUTTON_PRESSED))
-      {
-        ESP_LOGW(TAG, "[ MODE ] Button pressed, stop event received");
-        break;
-      }
-    }
-
-    if ((int) msg.data == get_input_rec_id())
-    {
-      if (msg.cmd == PERIPH_BUTTON_PRESSED)
-      {
-        ESP_LOGE(TAG, "Now recording, release [Rec] to STOP");
-        audio_pipeline_stop(pipeline_play);
-        audio_pipeline_wait_for_stop(pipeline_play);
-        audio_pipeline_terminate(pipeline_play);
-        audio_pipeline_reset_ringbuffer(pipeline_play);
-        audio_pipeline_reset_elements(pipeline_play);
-
-        /**
-         * Audio Recording Flow:
-         * [codec_chip]-->i2s_stream--->wav_encoder-->fatfs_stream-->[sdcard]
-         */
-        // ESP_LOGI(TAG, "Setup file path to save recorded audio");
-        i2s_stream_set_clk(i2s_stream_reader, AUDIO_SAMPLE_RATE, AUDIO_BITS, AUDIO_CHANNELS);
-        // audio_element_set_uri(fatfs_writer_el, "/sdcard/rec.wav");
-        ESP_LOGI(TAG, "Sending recording to server...");
-        audio_pipeline_run(pipeline_record);
-      }
-      else if (msg.cmd == PERIPH_BUTTON_RELEASE || msg.cmd == PERIPH_BUTTON_LONG_RELEASE)
-      {
-        ESP_LOGI(TAG, "START Playback");
-        // audio_element_set_ringbuf_done(i2s_stream_reader);
-        audio_pipeline_stop(pipeline_record);
-        audio_pipeline_wait_for_stop(pipeline_record);
-        audio_pipeline_terminate(pipeline_record);
-        audio_pipeline_reset_ringbuffer(pipeline_record);
-        audio_pipeline_reset_elements(pipeline_record);
-
-        /**
-         * Audio Playback Flow:
-         * [sdcard]-->fatfs_stream-->wav_decoder-->sonic-->i2s_stream-->[codec_chip]
-         */
-        // ESP_LOGI(TAG, "Setup file path to read the wav audio to play");
-        i2s_stream_set_clk(i2s_stream_writer, AUDIO_SAMPLE_RATE, AUDIO_BITS, AUDIO_CHANNELS);
-        // audio_element_set_uri(fatfs_reader_el, "/sdcard/rec.wav");
-        // if (is_modify_speed) {
-          // sonic_set_pitch_and_speed_info(sonic_el, 1.0f, SONIC_SPEED);
-        // } else {
-          // sonic_set_pitch_and_speed_info(sonic_el, SONIC_PITCH, 1.0f);
-        // }
-        audio_pipeline_run(pipeline_play);
-      }
-    }
-
-    // note: not seeing this if-statement executed...still works from playback pipeline?
-    if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT
-      && msg.source == (void *) mp3_decoder
-      && msg.cmd == AEL_MSG_CMD_REPORT_MUSIC_INFO)
-    {
-      audio_element_info_t music_info = {0};
-      audio_element_getinfo(mp3_decoder, &music_info);
-
-      ESP_LOGI(TAG, "[ * ] Receive music info from mp3 decoder, sample_rates=%d, bits=%d, ch=%d",
-              music_info.sample_rates, music_info.bits, music_info.channels);
-
-      i2s_stream_set_clk(i2s_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
-      continue;
-    }
-  }
-
-  ESP_LOGI(TAG, "[ 4 ] Stop audio_pipeline");
-  audio_pipeline_stop(pipeline_record);
-  audio_pipeline_wait_for_stop(pipeline_record);
-  audio_pipeline_terminate(pipeline_record);
-  audio_pipeline_stop(pipeline_play);
-  audio_pipeline_wait_for_stop(pipeline_play);
-  audio_pipeline_terminate(pipeline_play);
-
-  // audio_pipeline_unregister(pipeline_play, fatfs_reader_el);
-  // audio_pipeline_unregister(pipeline_play, wav_decoder_el);
-  audio_pipeline_unregister(pipeline_play, i2s_stream_writer);
-  audio_pipeline_unregister(pipeline_play, http_stream_reader);
-  audio_pipeline_unregister(pipeline_play, mp3_decoder);
-
-  audio_pipeline_unregister(pipeline_record, i2s_stream_reader);
-  audio_pipeline_unregister(pipeline_record, http_stream_writer);
-  // audio_pipeline_unregister(pipeline_rec, sonic_el);
-  // audio_pipeline_unregister(pipeline_rec, wav_encoder_el);
-  // audio_pipeline_unregister(pipeline_rec, fatfs_writer_el);
-
-  /* Terminate the pipeline before removing the listener */
-  audio_pipeline_remove_listener(pipeline_record);
-  audio_pipeline_remove_listener(pipeline_play);
-
-  /* Stop all peripherals before removing the listener */
-  esp_periph_set_stop_all(set);
-  audio_event_iface_remove_listener(esp_periph_set_get_event_iface(set), evt);
-
-  /* Make sure audio_pipeline_remove_listener & audio_event_iface_remove_listener are called before destroying event_iface */
-  audio_event_iface_destroy(evt);
-
-  /* Release all resources */
-  audio_pipeline_deinit(pipeline_record);
-  audio_pipeline_deinit(pipeline_play);
-
-  // audio_element_deinit(fatfs_reader_el);
-  // audio_element_deinit(wav_decoder_el);
-  audio_element_deinit(i2s_stream_writer);
-  audio_element_deinit(http_stream_reader);
-  audio_element_deinit(mp3_decoder);
-
-  audio_element_deinit(i2s_stream_reader);
-  audio_element_deinit(http_stream_writer);
-  // audio_element_deinit(sonic_el);
-  // audio_element_deinit(wav_encoder_el);
-  // audio_element_deinit(fatfs_writer_el);
-}
-
-void app_main(void)
-{
-  esp_log_level_set("*", ESP_LOG_WARN);
-  esp_log_level_set(TAG, ESP_LOG_INFO);
-
-  esp_err_t err = nvs_flash_init();
-  if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
-    // NVS partition was truncated and needs to be erased
-    // Retry nvs_flash_init
-    ESP_ERROR_CHECK(nvs_flash_erase());
-    err = nvs_flash_init();
-  }
-#if (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 1, 0))
-  ESP_ERROR_CHECK(esp_netif_init());
-#else
-  tcpip_adapter_init();
-#endif
-
-  // Initialize peripherals management
-  esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
-  set = esp_periph_set_init(&periph_cfg);
-
-  // Connect to the Wi-Fi network
-  ESP_LOGI(TAG, "[ . ] Start and wait for Wi-Fi network");
-  periph_wifi_cfg_t wifi_cfg = {
-      .wifi_config.sta.ssid = CONFIG_WIFI_SSID,
-      .wifi_config.sta.password = CONFIG_WIFI_PASSWORD,
-  };
-  esp_periph_handle_t wifi_handle = periph_wifi_init(&wifi_cfg);
-  esp_periph_start(set, wifi_handle);
-  periph_wifi_wait_for_connected(wifi_handle, portMAX_DELAY);
-
-  // Initialize SD Card peripheral
-  // audio_board_sdcard_init(set, SD_MODE_1_LINE);
-
-  // Initialize Button peripheral
-  audio_board_key_init(set);
-
-  // Setup audio codec
-  ESP_LOGI(TAG, "[ . ] Start codec chip");
-  audio_board_handle_t board_handle = audio_board_init();
-  audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
-
-  audio_hal_get_volume(board_handle->audio_hal, &player_volume);
-
-  // Start record/playback task
-  record_playback_task(board_handle);
-  esp_periph_set_destroy(set);
+  int player_volume;
+  ESP_ERROR_CHECK(audio_hal_get_volume(board_handle->audio_hal, &player_volume));
+  return player_volume;
 }

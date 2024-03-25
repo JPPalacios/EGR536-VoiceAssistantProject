@@ -286,6 +286,115 @@ If your development board cannot upload the voice to the HTTP server, please che
 5. Whether the development board and HTTP server are in the same Wi-Fi network.
 
 
+```c
+export IDF_PATH=/Users/jppalacios/esp-adf/esp-idf
+/Users/jppalacios/.espressif/python_env/idf4.4_py3.11_env/bin/python /Users/jppalacios/esp-adf/esp-idf/tools/idf_monitor.py -p /dev/cu.usbserial-2130 -b 115200 --toolchain-prefix xtensa-esp32-elf- --target esp32 /Users/jppalacios/esp/EGR536-VoiceAssistantProject/build/EGR536-VoiceAssistantProject.elf
+(base) jppalacios@macbook EGR536-VoiceAssistantProject % export IDF_PATH=/Users/jppalacios/esp-adf/esp-idf
+(base) jppalacios@macbook EGR536-VoiceAssistantProject % /Users/jppalacios/.espressif/python_env/idf4.4_py3.11_env/bin/python /Users/jppalacios/esp-adf/esp-idf/tools/idf_monitor.py -p /dev/cu.usbserial-2130 -b 115200 --toolchain-prefix 
+xtensa-esp32-elf- --target esp32 /Users/jppalacios/esp/EGR536-VoiceAssistantProject/build/EGR536-VoiceAssistantProject.elf
+--- idf_monitor on /dev/cu.usbserial-2130 115200 ---
+--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H ---
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:1
+load:0x3fff0030,len:6628
+load:0x40078000,len:15076
+load:0x40080400,len:3816
+0x40080400: _init at ??:?
+
+entry 0x40080698
+I (27) boot: ESP-IDF v4.4.4-278-g3c8bc2213c-dirty 2nd stage bootloader
+I (27) boot: compile time 12:13:14
+I (28) boot: chip revision: v3.0
+I (32) boot.esp32: SPI Speed      : 80MHz
+I (37) boot.esp32: SPI Mode       : DIO
+I (41) boot.esp32: SPI Flash Size : 8MB
+I (46) boot: Enabling RNG early entropy source...
+I (51) boot: Partition Table:
+I (55) boot: ## Label            Usage          Type ST Offset   Length
+I (62) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (70) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (77) boot:  2 factory          factory app      00 00 00010000 00200000
+I (85) boot: End of partition table
+I (89) esp_image: segment 0: paddr=00010020 vaddr=3f400020 size=252e4h (152292) map
+I (143) esp_image: segment 1: paddr=0003530c vaddr=3ffb0000 size=03018h ( 12312) load
+I (148) esp_image: segment 2: paddr=0003832c vaddr=40080000 size=07cech ( 31980) load
+I (160) esp_image: segment 3: paddr=00040020 vaddr=400d0020 size=9ee3ch (650812) map
+I (357) esp_image: segment 4: paddr=000dee64 vaddr=40087cec size=0d680h ( 54912) load
+I (387) boot: Loaded app from partition at offset 0x10000
+I (387) boot: Disabling RNG early entropy source...
+I (399) cpu_start: Pro cpu up.
+I (399) cpu_start: Starting app cpu, entry point is 0x400812d0
+0x400812d0: call_start_cpu1 at /Users/jppalacios/esp-adf/esp-idf/components/esp_system/port/cpu_start.c:148
+
+I (0) cpu_start: App cpu up.
+I (413) cpu_start: Pro cpu start user code
+I (413) cpu_start: cpu freq: 160000000
+I (413) cpu_start: Application information:
+I (418) cpu_start: Project name:     EGR536-VoiceAssistantProject
+I (424) cpu_start: App version:      b72e90a-dirty
+I (430) cpu_start: Compile time:     Mar 14 2024 23:24:23
+I (436) cpu_start: ELF file SHA256:  9560b91bb5f1a7e0...
+I (442) cpu_start: ESP-IDF:          v4.4.4-278-g3c8bc2213c-dirty
+I (449) cpu_start: Min chip rev:     v0.0
+I (453) cpu_start: Max chip rev:     v3.99 
+I (458) cpu_start: Chip rev:         v3.0
+I (463) heap_init: Initializing. RAM available for dynamic allocation:
+I (470) heap_init: At 3FFAE6E0 len 00001920 (6 KiB): DRAM
+I (476) heap_init: At 3FFB7378 len 00028C88 (163 KiB): DRAM
+I (482) heap_init: At 3FFE0440 len 00003AE0 (14 KiB): D/IRAM
+I (489) heap_init: At 3FFE4350 len 0001BCB0 (111 KiB): D/IRAM
+I (495) heap_init: At 4009536C len 0000AC94 (43 KiB): IRAM
+I (502) spi_flash: detected chip: generic
+I (506) spi_flash: flash io: dio
+I (511) cpu_start: Starting scheduler on PRO CPU.
+I (0) cpu_start: Starting scheduler on APP CPU.
+I (560) VOICE_ASSISTANT: [ . ] Start and wait for Wi-Fi network
+W (12030) PERIPH_WIFI: Wi-Fi disconnected from SSID iphone, auto-reconnect enabled, reconnect after 1000 ms
+W (15430) PERIPH_WIFI: Wi-Fi disconnected from SSID iphone, auto-reconnect enabled, reconnect after 1000 ms
+W (16720) PERIPH_WIFI: WiFi Event cb, Unhandle event_base:WIFI_EVENT, event_id:4
+Prompt counter = 1
+Measured current = 20 mA
+Run time:
+Nothing saved yet!
+I (17730) VOICE_ASSISTANT: [ . ] Start codec chip
+W (17750) I2C_BUS: I2C bus has been already created, [port:0]
+I (17770) VOICE_ASSISTANT: [1.1] Initialize all pipelines
+I (17770) VOICE_ASSISTANT: [1.2] Create audio elements for recorder pipeline
+I (17770) VOICE_ASSISTANT: [1.3] Register audio elements to recorder pipeline
+I (17780) VOICE_ASSISTANT: [2.2] Create audio elements for playback pipeline
+E (17780) I2S: register I2S object to platform failed
+I (17790) VOICE_ASSISTANT: [2.3] Register audio elements to playback pipeline
+I (17800) VOICE_ASSISTANT: [ 3 ] Set up  event listener
+W (17800) VOICE_ASSISTANT: Press [Rec] to start recording
+E (32560) VOICE_ASSISTANT: Now recording, release [Rec] to STOP
+W (32560) AUDIO_PIPELINE: Without stop, st:1
+W (32560) AUDIO_PIPELINE: Without wait stop, st:1
+W (32560) AUDIO_ELEMENT: [http_reader] Element has not create when AUDIO_ELEMENT_TERMINATE
+W (32570) AUDIO_ELEMENT: [mp3] Element has not create when AUDIO_ELEMENT_TERMINATE
+W (32580) AUDIO_ELEMENT: [i2s_writer] Element has not create when AUDIO_ELEMENT_TERMINATE
+Prompt counter = 2
+Measured current = 20 mA
+Run time:
+Nothing saved yet!
+I (32610) VOICE_ASSISTANT: Sending recording to server...
+W (32610) AUDIO_THREAD: Make sure selected the `CONFIG_SPIRAM_BOOT_INIT` and `CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY` by `make menuconfig`
+Total bytes written: 98304
+I (35620) VOICE_ASSISTANT: START Playback
+W (35620) AUDIO_ELEMENT: IN-[http_writer] AEL_IO_ABORT
+I (35620) VOICE_ASSISTANT: [ + ] HTTP client HTTP_STREAM_POST_REQUEST, write end chunked marker
+I (40390) VOICE_ASSISTANT: [ + ] HTTP client HTTP_STREAM_FINISH_REQUEST
+W (40390) HTTP_CLIENT: esp_transport_read returned:-1 and errno:128 
+I (40390) VOICE_ASSISTANT: Got HTTP Response = File 20240315T033321Z_24000_16_1.wav was written, size 98304
+W (40400) AUDIO_THREAD: Make sure selected the `CONFIG_SPIRAM_BOOT_INIT` and `CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY` by `make menuconfig`
+W (40420) AUDIO_THREAD: Make sure selected the `CONFIG_SPIRAM_BOOT_INIT` and `CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY` by `make menuconfig`
+W (44080) HTTP_STREAM: No more data,errno:0, total_bytes:42720, rlen = 0
+
+```
+
 ## Technical Support and Feedback
 
 <!-- Please use the following feedback channels:
