@@ -32,9 +32,22 @@
 #include "esp_http_client.h"
 #include "http_stream.h"
 
+#define DELAY(ms) vTaskDelay(pdMS_TO_TICKS(ms))
+#define DELAY_1S DELAY(1000)
 
 static esp_periph_set_handle_t periph_set;
 audio_board_handle_t board_handle;
+
+const char *MP3_STREAM_URIS[] = {
+    MP3_STREAM_URI_0,
+    MP3_STREAM_URI_1,
+    MP3_STREAM_URI_2,
+    RESPONSE_URI
+};
+
+const int MP3_SAMPLE_RATES[] = {22050, 24000, 12000};
+const int MP3_BITS[]         = {16, 16, 16};
+const int MP3_CHANNELS[]     = {2, 2, 2};
 
 static const char *TAG = "VOICE_ASSISTANT";
 
@@ -86,7 +99,9 @@ void run_voice_assistant_task()
   audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
 
   int player_volume = get_audio_hal_volume(board_handle);
+  audio_hal_set_volume(board_handle->audio_hal, 80);
 
+  int select_radio_url = 0;
 
   ESP_LOGI(TAG, "[1.1] Initialize all pipelines");
   record_pipeline = audio_pipeline_init(&pipeline_cfg);
@@ -120,6 +135,7 @@ void run_voice_assistant_task()
 
   ESP_LOGI(TAG, "[ 3.1 ] Set up event listener");
   audio_event_iface_cfg_t event_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
+  event_cfg.external_queue_size = 20;
   audio_event_iface_handle_t event  = audio_event_iface_init(&event_cfg);
   audio_event_iface_set_listener(esp_periph_set_get_event_iface(periph_set), event);
 
@@ -127,7 +143,33 @@ void run_voice_assistant_task()
   audio_element_set_uri(http_stream_writer, SERVER_UPLOAD_URI);
   audio_element_set_uri(http_stream_reader, RESPONSE_URI);
 
-  ESP_LOGW(TAG, "[ LOOP ] Press [Rec] to start recording, press [Mode] to request data log");
+  /* Send HTTP POST requesting chime */
+  ESP_LOGI(TAG, "play chime to indicate boot up...");
+
+  char data[20];
+  snprintf(data, sizeof(data), "\"chime\": %d", 0);
+  http_post_request(SERVER_CHIME_URI, 0);
+  // DELAY_1S;
+  ESP_LOGI(TAG, "Now playing server response");
+  i2s_stream_set_clk(i2s_stream_writer, 44100, AUDIO_BITS, 2);
+    /* Pause play pipelines */
+  audio_pipeline_stop(play_pipeline);
+  audio_pipeline_wait_for_stop(play_pipeline);
+  audio_pipeline_reset_ringbuffer(play_pipeline);
+  audio_pipeline_reset_elements(play_pipeline);
+  DELAY_1S;
+  ESP_LOGI(TAG, "simple delay");
+  audio_pipeline_run(play_pipeline);
+
+  /* Pause record pipelines */
+  audio_pipeline_stop(record_pipeline);
+  audio_pipeline_wait_for_stop(record_pipeline);
+  audio_pipeline_reset_ringbuffer(record_pipeline);
+  audio_pipeline_reset_elements(record_pipeline);
+
+  ESP_LOGE(TAG, "[ LOOP ] Press [Rec] to record, \n\
+      press [Mode] to request data log, \n\
+      press [Play] to play radio");
   while(1)
   {
     audio_event_iface_msg_t msg;
@@ -147,7 +189,7 @@ void run_voice_assistant_task()
         player_volume = 100;
       }
       audio_hal_set_volume(board_handle->audio_hal, player_volume);
-      ESP_LOGI(TAG, "[ * ] Volume +: %d %%", player_volume);
+      ESP_LOGI(TAG, "[ + ] Volume UP: %d %%", player_volume);
     }
 
     if ((int) msg.data == get_input_voldown_id())
@@ -158,7 +200,7 @@ void run_voice_assistant_task()
         player_volume = 0;
       }
       audio_hal_set_volume(board_handle->audio_hal, player_volume);
-      ESP_LOGI(TAG, "[ * ] Volume -: %d %%", player_volume);
+      ESP_LOGI(TAG, "[ - ] Volume DOWN: %d %%", player_volume);
     }
 
     if ((int) msg.data == get_input_mode_id())
@@ -166,11 +208,12 @@ void run_voice_assistant_task()
       if ((msg.cmd == PERIPH_BUTTON_PRESSED))
       {
         /**
-         * Audio record flow:
+         * Audio play flow:
          * nvs_storage --> http_post_msg ))) (2.4 GHz Wi-Fi) ))) [http_server]
          */
+        audio_element_set_uri(http_stream_reader, RESPONSE_URI);
 
-        /* Pause record pipelines */
+        /* Pause play pipelines */
         audio_pipeline_stop(play_pipeline);
         audio_pipeline_wait_for_stop(play_pipeline);
         audio_pipeline_reset_ringbuffer(play_pipeline);
@@ -210,6 +253,7 @@ void run_voice_assistant_task()
          * Audio record flow:
          * [microphone] --> codec_chip --> i2s_stream --> http_stream ))) (2.4 GHz Wi-Fi) ))) [http_server]
          */
+        audio_element_set_uri(http_stream_reader, RESPONSE_URI);
 
         /* Pause play pipeline */
         audio_pipeline_stop(play_pipeline);
@@ -244,8 +288,55 @@ void run_voice_assistant_task()
         audio_pipeline_run(play_pipeline);
       }
     }
-  }
 
+    if ((int) msg.data == get_input_play_id())
+    {
+      if (msg.cmd == PERIPH_BUTTON_PRESSED)
+      {
+        /* Pause play pipelines */
+        audio_pipeline_stop(play_pipeline);
+        audio_pipeline_wait_for_stop(play_pipeline);
+        audio_pipeline_reset_ringbuffer(play_pipeline);
+        audio_pipeline_reset_elements(play_pipeline);
+
+        if (select_radio_url < 4)
+        {
+          ESP_LOGE(TAG, "Selecting radio station %d of 3...", select_radio_url + 1);
+        }
+        else{
+          ESP_LOGW(TAG, "Selecting voice assistant server...");
+        }
+        audio_element_set_uri(http_stream_reader, MP3_STREAM_URIS[select_radio_url]);
+        i2s_stream_set_clk(\
+          i2s_stream_writer,\
+          MP3_SAMPLE_RATES[select_radio_url],\
+          MP3_BITS[select_radio_url],\
+          MP3_CHANNELS[select_radio_url]\
+        );
+        select_radio_url = (select_radio_url + 1) % 3;
+
+      }
+      else if (msg.cmd == PERIPH_BUTTON_RELEASE || msg.cmd == PERIPH_BUTTON_LONG_RELEASE)
+      {
+        /**
+         * Radio player flow:
+         * [mp3_live_radio_url] ))) (2.4 GHz Wi-Fi) ))) http_stream --> mp3_decoder --> i2s_stream --> codec_chip --> [speaker]
+         */
+        if (select_radio_url < 4)
+        {
+          /* Pause record pipelines */
+          audio_pipeline_stop(record_pipeline);
+          audio_pipeline_wait_for_stop(record_pipeline);
+          audio_pipeline_reset_ringbuffer(record_pipeline);
+          audio_pipeline_reset_elements(record_pipeline);
+
+          ESP_LOGE(TAG, "[ LIVE ] Now playing radio");
+          audio_pipeline_run(play_pipeline);
+        }
+      }
+    }
+
+  }
 
   ESP_LOGI(TAG, "[ EXIT ] stopping pipelines, launching cleanup...");
   audio_pipeline_stop(record_pipeline);

@@ -17,8 +17,11 @@ from openai import OpenAI
 PORT = 8000
 MAX_PROMPT_TOKENS = 100
 
+CHIME_FILE = 'chime.mp3'
 SPEECH_RESPONSE_FILE = 'speech_response.mp3'
 TEXT_RESPONSE_FILE   = 'text_response.txt'
+
+selected_file = SPEECH_RESPONSE_FILE
 
 OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY')
 
@@ -52,6 +55,23 @@ class Handler(BaseHTTPRequestHandler):
         wavfile.writeframesraw(bytearray(data))
         wavfile.close()
         return filename
+
+    def _copy_mp3(self, source_file, destination_file):
+        try:
+            # Open the source MP3 file for reading in binary mode
+            with open(source_file, 'rb') as file:
+                # Read the contents of the source file
+                mp3_data = file.read()
+
+            # Open the destination MP3 file for writing in binary mode
+            with open(destination_file, 'wb') as file:
+                # Write the contents of the source file to the destination file
+                file.write(mp3_data)
+
+            print(f"Successfully copied {source_file} to {destination_file}")
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
     def do_POST(self):
         urlparts = parse.urlparse(self.path)
@@ -158,6 +178,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             body = 'File {} was written, size {}'.format(speech_prompt, total_bytes)
             self.wfile.write(body.encode('utf-8'))
+            selected_file = SPEECH_RESPONSE_FILE
 
         elif (request_file_path == 'log'):
             content_length = int(self.headers['Content-Length'])
@@ -176,6 +197,18 @@ class Handler(BaseHTTPRequestHandler):
 
             # note: stream and read our response back
             speech_response.stream_to_file(SPEECH_RESPONSE_FILE)
+            selected_file = SPEECH_RESPONSE_FILE
+
+        elif (request_file_path == 'chime'):
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(post_data)
+            chime = data.get('counter')
+
+            print("Received chime:", chime)
+            
+            # note: copy chime.mp3 into speech_response.mp3
+            self._copy_mp3("./chime.mp3", "./speech_response.mp3")
 
     def do_GET(self):
         print("Do GET")

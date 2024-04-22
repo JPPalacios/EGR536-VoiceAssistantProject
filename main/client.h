@@ -12,41 +12,44 @@
 #define STORAGE_NAMESPACE "storage"
 
 /* WI-FI PARAMETERS */
-#define SELECTED_NETWORK 0
+#define SELECTED_NETWORK 1
+
 #if SELECTED_NETWORK == 0
-#define WIFI_SSID     "ssd0"
-#define WIFI_PASSWORD "password0"
-#define SERVER "ipaddr0"
+#define WIFI_SSID     "SH1100SW2.4"
+#define WIFI_PASSWORD "Cocohydra123"
+#define SERVER "10.0.0.107"
 #elif SELECTED_NETWORK == 1
-#define WIFI_SSID     "ssd1"
-#define WIFI_PASSWORD "password1"
-#define SERVER "ipaddr1"
-#elif SELECTED_NETWORK == 2
-#define WIFI_SSID     "ssd2"
-#define WIFI_PASSWORD "password2"
-#define SERVER "ipaddr2"
+#define WIFI_SSID     "iphone"
+#define WIFI_PASSWORD "74515900"
+#define SERVER "172.20.10.7"
+// #define SERVER "JuanPalacios.pythonanywhere.com"
 #else
-#define WIFI_SSID     "myssd"
-#define WIFI_PASSWORD "password"
-#define SERVER "ipaddr"
+#define WIFI_SSID     "GV-Student"
+#define WIFI_PASSWORD "G01783155iwzj-gvsu"
+#define SERVER "35.40.169.239"
 #endif
 
 #define PORT "8000"
 
+#define CHIME_PATH "chime"
 #define LOG_PATH "log"
 #define UPLOAD_PATH "upload"
 
+#define SERVER_CHIME_URI  "http://" SERVER ":" PORT "/" CHIME_PATH
 #define SERVER_LOG_URI    "http://" SERVER ":" PORT "/" LOG_PATH
 #define SERVER_UPLOAD_URI "http://" SERVER ":" PORT "/" UPLOAD_PATH
 
 #define RESPONSE_PATH "speech_response.mp3"
 #define RESPONSE_URI  "http://" SERVER ":" PORT "/" RESPONSE_PATH
 
+#define MP3_STREAM_URI_0 "http://edge.audioxi.com/IRADNW"
+#define MP3_STREAM_URI_1 "http://playerservices.streamtheworld.com/pls/WUOMFM.pls"
+#define MP3_STREAM_URI_2 "http://26183.live.streamtheworld.com/CHTGFM.mp3"
+
 /* AUDIO PARAMETERS */
 #define AUDIO_SAMPLE_RATE  24000
 #define AUDIO_BITS         16
 #define AUDIO_CHANNELS     1
-
 
 /* NVS FUNCTIONS */
 

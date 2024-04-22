@@ -131,7 +131,7 @@ esp_err_t print_what_saved(void)
   nvs_handle_t my_handle;
   esp_err_t err;
 
-  printf("Voice Asistant Logs\n");
+  printf("Voice Assistant Logs\n");
 
   // Open
   err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
@@ -176,6 +176,20 @@ esp_err_t _http_stream_event_handler(http_stream_event_msg_t *msg)
   esp_http_client_handle_t http = (esp_http_client_handle_t)msg->http_client;
   char len_buf[16];
   static int total_write = 0;
+
+  /* EVENTS FOR MUSIC STREAM */
+  if (msg->event_id == HTTP_STREAM_RESOLVE_ALL_TRACKS) {
+    return ESP_OK;
+  }
+
+  if (msg->event_id == HTTP_STREAM_FINISH_TRACK) {
+    return http_stream_next_track(msg->el);
+  }
+  if (msg->event_id == HTTP_STREAM_FINISH_PLAYLIST) {
+    return http_stream_fetch_again(msg->el);
+  }
+
+  /* EVENTS FOR SERVER STREAMS */
 
   if (msg->event_id == HTTP_STREAM_PRE_REQUEST) {
     // set header
@@ -337,6 +351,10 @@ audio_element_handle_t create_http_stream(audio_stream_type_t type)
   if (http_cfg.type == AUDIO_STREAM_WRITER)
   {
     http_cfg.event_handle = _http_stream_event_handler;
+  }
+  else
+  {
+    http_cfg.enable_playlist_parser = true; // enables music streaming
   }
 
   audio_element_handle_t http_stream = http_stream_init(&http_cfg);
