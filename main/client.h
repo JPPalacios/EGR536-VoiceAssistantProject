@@ -15,18 +15,17 @@
 #define SELECTED_NETWORK 1
 
 #if SELECTED_NETWORK == 0
-#define WIFI_SSID     "SH1100SW2.4"
-#define WIFI_PASSWORD "Cocohydra123"
-#define SERVER "10.0.0.107"
+#define WIFI_SSID     "ssid"
+#define WIFI_PASSWORD "password"
+#define SERVER "ip"
 #elif SELECTED_NETWORK == 1
-#define WIFI_SSID     "iphone"
-#define WIFI_PASSWORD "74515900"
-#define SERVER "172.20.10.7"
-// #define SERVER "JuanPalacios.pythonanywhere.com"
+#define WIFI_SSID     "ssid"
+#define WIFI_PASSWORD "password"
+#define SERVER "ip"
 #else
-#define WIFI_SSID     "GV-Student"
-#define WIFI_PASSWORD "G01783155iwzj-gvsu"
-#define SERVER "35.40.169.239"
+#define WIFI_SSID     "ssid"
+#define WIFI_PASSWORD "password"
+#define SERVER "ip"
 #endif
 
 #define PORT "8000"
